@@ -9,10 +9,6 @@ const checkLikeQuery = `
 	SELECT account_id, post_id FROM liked_posts WHERE account_id = ? AND post_id = ?
 `
 
-// const checkBlockQuery = `
-// 	SELECT account_id, blocked_account_id FROM account_blocks WHERE account_id = ? AND blocked_account_id = ?
-// `
-
 // add new record that has account_id and followed_account_id accordingly
 const likeQuery = `
 	INSERT INTO liked_posts
@@ -33,7 +29,7 @@ async function Like(req: Request, res: Response) {
 	}
 	const account = req.account
 	const {post_to_like} = req.body
-	const like_row = (await Query(checkLikeQuery, [account?.account_id.toString(), post_to_like.toString()])) as Account[]
+	const like_row = (await Query(checkLikeQuery, [account?.account_id.toString(), post_to_like.toString()])) as Post[]
 	try {
 		if (like_row.length < 1) {
 			await Query(likeQuery, [account?.account_id.toString(), post_to_like.toString()])
@@ -47,9 +43,9 @@ async function Like(req: Request, res: Response) {
 			)
 		}
 	}
-	catch {
+	catch(e) {
 		return res.status(500).json(
-			{message: "Error occurred."} 
+			{message: e} 
 		)
 	}
 }

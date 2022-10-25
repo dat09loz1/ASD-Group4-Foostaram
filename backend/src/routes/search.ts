@@ -7,45 +7,6 @@ import formatErrors from '../util/formatErrors'
 
 //partial search with full text string: https://stackoverflow.com/questions/37711370/mysql-how-to-get-search-results-with-accurate-relevance
 
-// async function ShowPostSearchResults(req: Request, res: Response) {
-// 	const errors = validationResult(req)
-// 	if (!errors.isEmpty()) {
-// 		return res.status(400).json(formatErrors(errors))
-// 	}
-
-// 	const { searchStr } = req.body
-
-//   const SearchQuery = `
-//     select * from posts
-//   `
-
-// 	try {
-// 		const rows = (await Query(SearchQuery, [])) as Post[]
-
-// 		if (rows.length > 0) {
-// 			const fuse = new Fuse(rows, {
-// 				keys: ['location_name'],
-// 				minMatchCharLength: 0,
-// 				threshold: 0.3
-// 			})
-// 			const result: any[] = fuse.search(searchStr)
-// 			return res.status(200).json({
-// 				message: 'Search results:',
-// 				data: rows,
-// 			})
-// 		} else {
-// 			return res.status(200).json({
-// 				message: 'No results'
-// 			})
-// 		}
-// 	} catch {
-// 		return res
-// 			.status(500)
-// 			.json({ message: 'Failed to connect to the database' })
-// 	}
-// }
-
-
 //search suggestion - location
 async function SearchPosts(req: Request, res: Response) {
 	const errors = validationResult(req)
@@ -53,7 +14,7 @@ async function SearchPosts(req: Request, res: Response) {
 
 	const { searchStr } = req.body;
 
-  	const SearchQuery = `SELECT * from posts WHERE businessState IS NULL OR businessState = 1`
+  const SearchQuery = `SELECT location_name from posts WHERE businessState IS NULL OR businessState = 1`
 
 	try {
 		const rows = (await Query(SearchQuery, [])) as Post[] /*as Post[]*/  // TODO: don't use a shared type, make a new one (that's right)
@@ -122,39 +83,66 @@ async function SearchUsers(req: Request, res: Response) {
 	}
 }
 
-//show search results - user
-async function SearchPostResults(req: Request, res: Response) {
+//follower interface
+interface Follower {
+	account_id: number;
+	name: string;
+	username: string;
+	profile_picture_url: string;
+}
+
+//search suggestion - follower
+async function SearchFollowings (req: Request, res: Response) {
 	const errors = validationResult(req)
-	if (!errors.isEmpty()) return res.status(400).json(formatErrors(errors))
+	if (!errors.isEmpty()) {
+		return res.status(400).json(formatErrors(errors))
+	}
 
-	const { searchStr } = req.body;
+	const { searchStr, account_id } = req.body
 
-  	const SearchQuery = `select * from posts`
+	const query = `
+	select 
+		F.followed_account_id as account_id, 
+		A.name as name, 
+		A.username as username, 
+		A.profile_picture_url as profile_picture_url
+		from account_followers F
+		join accounts A on F.followed_account_id = A.account_id
+		where F.account_id = ${account_id}
+`
 
 	try {
-		const rows = (await Query(SearchQuery, [])) as Post[] 
-		const fuse = new Fuse(rows, {
-			keys: ['location_name'],
-			minMatchCharLength: -1,
+		const followers = (await Query(query, [])) as Follower[]
+		const fuse = new Fuse(followers, {
+			keys: ['username'],
+			minMatchCharLength: -1, 
 			threshold: 0.5
 		})
-		const result: any[] = fuse.search(searchStr)
+		let result
 
+		if (searchStr === "_all")
+			result = followers
+		else
+			result = fuse.search(searchStr)
+		
 		if (result.length > 0) {
 			return res.status(200).json({
-				message: 'Post / Location matches found!',
+				message: 'Followers matches found!',
 				data: result,
 			})
-		} else {
+		}
+		else {
 			return res.status(200).json({
 				message: 'No results'
 			})
 		}
-	} catch {
+	}
+	catch {
 		return res
 			.status(500)
 			.json({ message: 'Failed to connect to the database' })
 	}
 }
 
-export { SearchUsers, SearchPosts, SearchPostResults }
+
+export { SearchUsers, SearchPosts, SearchFollowings }
